@@ -1,18 +1,22 @@
-# Feliz Cristais Impressora
+# Feliz Cristais Gestão
 
-Aplicativo para Windows e Mac que imprime sozinho os pedidos da loja **Feliz Cristais**.
+Aplicativo para Windows e Mac da loja **Feliz Cristais** (a partir da versão 2.0; antes se chamava *Feliz Cristais Impressora*).
 
-- Fica na bandeja do sistema (ao lado do relógio) e roda em segundo plano.
-- Inicia junto com o computador.
-- Imprime o cupom do pedido na impressora escolhida (térmica 58/80 mm ou comum), sem janela de confirmação.
-- Atualiza sozinho quando sai uma versão nova aqui no GitHub.
+- Abre o **painel da loja** numa janela própria, com o login guardado.
+- **Avisa na hora** com notificações do sistema e som: pedido novo, pagamento aprovado, cliente esperando no chat, mensagem do site, agradecimentos a enviar.
+- Mostra o **número de pendências** no ícone (barra de tarefas no Windows, Dock no Mac) e no ícone ao lado do relógio.
+- Menu ao lado do relógio com atalhos: Pedidos, Atendimento, Retiradas na loja, Relatórios.
+- **Imprime sozinho** o cupom de cada pedido na impressora escolhida (térmica 58/80 mm ou comum), sem janela de confirmação.
+- Inicia junto com o computador e **atualiza sozinho** quando sai uma versão nova aqui no GitHub.
+
+Quem já usa a versão *Impressora* recebe a 2.0 automaticamente; a configuração (site, chave e impressora) continua a mesma.
 
 ## Instalar
 
 Baixe a versão mais nova em **Releases**:
 
-- Windows: `Feliz-Cristais-Impressora-Setup.exe`
-- Mac: `Feliz-Cristais-Impressora-Mac.dmg`
+- Windows: `Feliz-Cristais-Gestao-Setup.exe`
+- Mac: `Feliz-Cristais-Gestao-Mac.dmg`
 
 Depois de instalar, abra o aplicativo e preencha:
 

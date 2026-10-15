@@ -4,7 +4,7 @@
 
   function showState(s) {
     $('status').classList.toggle('on', !!s.online);
-    $('st-title').textContent = s.online ? 'Conectada à loja' : 'Desconectada';
+    $('st-title').textContent = s.online ? 'Impressora conectada à loja' : 'Impressora desconectada';
     $('st-msg').textContent = s.message + (s.last ? ' · último: ' + s.last : '');
   }
   function showLog(list) {
@@ -37,6 +37,9 @@
     f.every.value = String(d.config.every || 5);
     f.autostart.checked = !!d.config.autostart;
     f.notify.checked = !!d.config.notify;
+    f.alerts.checked = d.config.alerts !== false;
+    f.sound.checked = d.config.sound !== false;
+    f.printOn.checked = d.config.printOn !== false;
     fillPrinters(d.printers, d.config.printer);
     showState(d.state);
     showLog(d.log);
@@ -66,6 +69,7 @@
     window.fc.save({
       site: f.site.value.trim(), key: f.key.value.trim(), printer: f.printer.value,
       copies: f.copies.value, every: f.every.value, autostart: f.autostart.checked, notify: f.notify.checked,
+      alerts: f.alerts.checked, sound: f.sound.checked, printOn: f.printOn.checked,
     }).then(function (r) {
       showState(r.state);
       $('save').disabled = false;
@@ -80,4 +84,5 @@
     window.fc.printers().then(function (list) { fillPrinters(list, f.printer.value); });
   });
   $('upd').addEventListener('click', function () { window.fc.update(); });
+  $('panel').addEventListener('click', function () { window.fc.panel(); });
 })();

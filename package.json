@@ -1,8 +1,8 @@
 {
   "name": "feliz-cristais-impressora",
-  "productName": "Feliz Cristais Impressora",
-  "version": "1.0.2",
-  "description": "Imprime sozinho os pedidos da loja Feliz Cristais na impressora escolhida (Windows e Mac).",
+  "productName": "Feliz Cristais Gestão",
+  "version": "2.0.0",
+  "description": "Painel da loja Feliz Cristais no computador: avisos de pedidos e atendimento na hora, contador de pendências e impressão automática dos pedidos (Windows e Mac).",
   "main": "src/main.js",
   "author": "Feliz Cristais",
   "license": "UNLICENSED",
@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "br.com.felizcristais.impressora",
-    "productName": "Feliz Cristais Impressora",
+    "productName": "Feliz Cristais Gestão",
     "copyright": "Feliz Cristais",
     "directories": {
       "buildResources": "build",
@@ -49,7 +49,7 @@
         }
       ],
       "icon": "build/icon.png",
-      "artifactName": "Feliz-Cristais-Impressora-Setup.${ext}"
+      "artifactName": "Feliz-Cristais-Gestao-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -57,7 +57,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Feliz Cristais Impressora",
+      "shortcutName": "Feliz Cristais Gestão",
       "runAfterFinish": true,
       "language": "1046",
       "installerSidebar": "build/installerSidebar.bmp",
@@ -81,19 +81,19 @@
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.business",
-      "artifactName": "Feliz-Cristais-Impressora-Mac.${ext}",
+      "artifactName": "Feliz-Cristais-Gestao-Mac.${ext}",
       "extendInfo": {
-        "LSUIElement": true
+        "LSUIElement": false
       }
     },
     "dmg": {
-      "title": "Feliz Cristais Impressora"
+      "title": "Feliz Cristais Gestão"
     },
     "fileAssociations": [
       {
         "ext": "fcprint",
-        "name": "Configuração Feliz Cristais Impressora",
-        "description": "Configuração da impressão de pedidos",
+        "name": "Configuração Feliz Cristais",
+        "description": "Configuração do app Feliz Cristais Gestão",
         "role": "Viewer"
       }
     ]

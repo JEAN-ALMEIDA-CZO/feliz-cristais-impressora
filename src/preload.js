@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('fc', {
   importFile: (file) => ipcRenderer.invoke('import', file),
   pathFor: (file) => webUtils.getPathForFile(file),
   update: () => ipcRenderer.invoke('update'),
+  panel: () => ipcRenderer.invoke('panel'),
   open: (url) => ipcRenderer.invoke('open', url),
   on: (channel, fn) => {
     if (['state', 'log', 'config'].includes(channel)) ipcRenderer.on(channel, (_e, data) => fn(data));
