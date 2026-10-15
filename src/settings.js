@@ -42,7 +42,21 @@
     showLog(d.log);
     $('ver').textContent = 'Versão ' + d.version;
   });
+  function fillConfig(c) {
+    f.site.value = c.site || '';
+    f.key.value = c.key || '';
+    f.copies.value = String(c.copies || 1);
+  }
+  window.fc.on('config', fillConfig);
   window.fc.on('state', showState);
+  $('import').addEventListener('click', function () { window.fc.importFile(); });
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (t) { document.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { document.addEventListener(t, function (ev) { ev.preventDefault(); if (t === 'drop' || ev.target === document.documentElement) drop.classList.remove('over'); }); });
+  document.addEventListener('drop', function (ev) {
+    var file = ev.dataTransfer && ev.dataTransfer.files[0];
+    if (file) window.fc.importFile(window.fc.pathFor(file));
+  });
   window.fc.on('log', showLog);
 
   f.addEventListener('submit', function (ev) {

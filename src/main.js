@@ -4,11 +4,14 @@
  * segundos e imprime o cupom na impressora escolhida, sem janela de confirmação.
  * Inicia junto com o computador e se atualiza sozinho pelas versões publicadas no GitHub.
  */
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, Notification, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, Notification, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
+
+// Perfil separado para testes (desenvolvimento): FC_USER_DATA=pasta
+if (process.env.FC_USER_DATA) app.setPath('userData', process.env.FC_USER_DATA);
 
 // Uma cópia só (abrir de novo traz a janela da que já está rodando)
 if (!app.requestSingleInstanceLock()) {
@@ -239,8 +242,69 @@ async function listPrinters() {
   return list.map((p) => ({ name: p.name, label: p.displayName || p.name, isDefault: !!p.isDefault }));
 }
 
+// ---------------------------------------------------------------- Arquivo de configuração (.fcprint)
+/** Lê o arquivo gerado no painel da loja (Impressão de pedidos) e já conecta. */
+async function importConfigFile(file, quiet = false) {
+  try {
+    const d = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    if (d.tipo !== 'feliz-cristais-impressora' || !d.site || !d.chave) throw new Error('Este arquivo não é uma configuração da Feliz Cristais Impressora.');
+    config = { ...config, site: String(d.site), key: String(d.chave), copies: Math.max(1, Math.min(5, Number(d.vias) || config.copies)) };
+    saveConfig();
+    addLog(`Configuração de ${d.loja || 'loja'} importada ✓`, 'ok');
+    setState({ online: false, message: 'Conectando…' });
+    try {
+      const p = await api('ping');
+      setState({ online: true, message: `Conectado à ${p.store}. Aguardando pedidos…` });
+      addLog(`Conectado à ${p.store} ✓`, 'ok');
+      if (!quiet && Notification.isSupported()) new Notification({ title: 'Impressora configurada', body: `Conectada à ${p.store}. Escolha a impressora e faça um teste.` }).show();
+    } catch (e) {
+      setState({ online: false, message: e.message });
+      addLog(e.message, 'error');
+    }
+    send('config', config);
+    startLoop();
+    return { ok: true, config, state };
+  } catch (e) {
+    addLog(e.message.startsWith('Este arquivo') ? e.message : 'Não foi possível ler o arquivo de configuração.', 'error');
+    return { ok: false, error: e.message };
+  }
+}
+/** Arquivo .fcprint recebido pela linha de comando (dois cliques no arquivo, no Windows). */
+function fileFromArgs(argv) {
+  return (argv || []).find((a) => /\.fcprint$/i.test(a) && fs.existsSync(a));
+}
+/** Primeira vez: procura o arquivo na pasta Downloads (o mais recente) e configura sozinho. */
+function findInDownloads() {
+  try {
+    const dir = app.getPath('downloads');
+    const files = fs.readdirSync(dir).filter((f) => /^feliz-impressora.*\.fcprint$/i.test(f))
+      .map((f) => ({ f: path.join(dir, f), t: fs.statSync(path.join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+    return files.length ? files[0].f : null;
+  } catch (e) {
+    return null;
+  }
+}
+let pendingFile = null;
+app.on('open-file', (e, file) => { // Mac: dois cliques no arquivo
+  e.preventDefault();
+  if (app.isReady()) { openWindow(); importConfigFile(file); } else pendingFile = file;
+});
+ipcMain.handle('import', async (_e, file) => {
+  let f = file;
+  if (!f) {
+    const r = await dialog.showOpenDialog(win, { title: 'Arquivo de configuração', filters: [{ name: 'Configuração da impressora', extensions: ['fcprint'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths.length) return { ok: false };
+    f = r.filePaths[0];
+  }
+  return importConfigFile(f);
+});
+
 // ---------------------------------------------------------------- Início
-app.on('second-instance', openWindow);
+app.on('second-instance', (_e, argv) => {
+  openWindow();
+  const f = fileFromArgs(argv);
+  if (f) importConfigFile(f);
+});
 app.on('window-all-closed', (e) => e.preventDefault()); // continua na bandeja
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
@@ -251,7 +315,9 @@ app.whenReady().then(() => {
   tray.on('click', openWindow);
   updateTray();
   const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAsHidden;
-  if (!config.site || !config.key || !hidden) openWindow();
+  const file = pendingFile || fileFromArgs(process.argv) || (!config.site || !config.key ? findInDownloads() : null);
+  if (!config.site || !config.key || !hidden || file) openWindow();
+  if (file) importConfigFile(file, true);
   startLoop();
   checkUpdates();
   setInterval(checkUpdates, 6 * 60 * 60 * 1000); // procura atualização a cada 6 horas
