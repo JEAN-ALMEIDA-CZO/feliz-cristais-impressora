@@ -1,0 +1,53 @@
+{
+  "name": "feliz-cristais-impressora",
+  "productName": "Feliz Cristais Impressora",
+  "version": "1.0.0",
+  "description": "Imprime sozinho os pedidos da loja Feliz Cristais na impressora escolhida (Windows e Mac).",
+  "main": "src/main.js",
+  "author": "Feliz Cristais",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "release": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "br.com.felizcristais.impressora",
+    "productName": "Feliz Cristais Impressora",
+    "copyright": "Feliz Cristais",
+    "directories": { "buildResources": "build", "output": "dist" },
+    "files": ["src/**/*", "package.json"],
+    "publish": [{ "provider": "github", "owner": "JEAN-ALMEIDA-CZO", "repo": "feliz-cristais-impressora", "releaseType": "release" }],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "artifactName": "Feliz-Cristais-Impressora-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Feliz Cristais Impressora",
+      "runAfterFinish": true,
+      "language": "1046"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }, { "target": "zip", "arch": ["universal"] }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "artifactName": "Feliz-Cristais-Impressora-Mac.${ext}",
+      "extendInfo": { "LSUIElement": true }
+    },
+    "dmg": { "title": "Feliz Cristais Impressora" }
+  }
+}

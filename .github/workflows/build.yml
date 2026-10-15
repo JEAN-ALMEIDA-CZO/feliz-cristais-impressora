@@ -1,0 +1,37 @@
+# Compila o aplicativo para Windows e Mac e publica a versão nas Releases do GitHub.
+# Para lançar uma versão nova: mude "version" no package.json, faça commit e crie a tag (ex.: v1.0.1).
+# O aplicativo instalado nas lojas encontra a versão nova sozinho e se atualiza.
+name: Compilar e publicar
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+          - os: macos-latest
+            target: --mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Compilar e publicar
+        run: npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Sem certificado da Apple/Microsoft por enquanto (veja o README)
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
