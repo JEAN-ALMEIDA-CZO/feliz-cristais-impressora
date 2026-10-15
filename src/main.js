@@ -74,7 +74,7 @@ async function api(action, { method = 'GET', extra = '' } = {}) {
 /** Imprime um HTML na impressora escolhida, sem diálogo. Devolve quando terminar. */
 function printHtml(html, copies = 1, paperMm = 80) {
   return new Promise((resolve, reject) => {
-    const w = new BrowserWindow({ show: false, width: 420, height: 900, webPreferences: { sandbox: true, javascript: false } });
+    const w = new BrowserWindow({ show: false, width: 420, height: 900, webPreferences: { sandbox: true, javascript: true } }); // o cupom desenha o QR code com JavaScript
     const file = path.join(app.getPath('temp'), `feliz-cupom-${Date.now()}.html`);
     fs.writeFileSync(file, html, 'utf8');
     const cleanup = () => { try { fs.unlinkSync(file); } catch (e) {} if (!w.isDestroyed()) w.destroy(); };

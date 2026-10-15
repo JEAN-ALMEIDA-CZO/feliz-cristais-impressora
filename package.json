@@ -1,7 +1,7 @@
 {
   "name": "feliz-cristais-impressora",
   "productName": "Feliz Cristais Impressora",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Imprime sozinho os pedidos da loja Feliz Cristais na impressora escolhida (Windows e Mac).",
   "main": "src/main.js",
   "author": "Feliz Cristais",
@@ -59,7 +59,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Feliz Cristais Impressora",
       "runAfterFinish": true,
-      "language": "1046"
+      "language": "1046",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp"
     },
     "mac": {
       "target": [
