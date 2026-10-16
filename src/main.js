@@ -90,8 +90,13 @@ async function api(action, { method = 'GET', extra = '' } = {}) {
   });
   if (r.status === 204) return null;
   if (r.status === 401) throw new Error('Chave de impressão inválida. Baixe de novo o arquivo de configuração no painel (Impressão de pedidos).');
-  if (!r.ok) throw new Error(`O site respondeu com erro ${r.status}.`);
-  return r.json();
+  if (!r.ok) throw new Error(`O site respondeu com erro ${r.status}. Tentando de novo…`);
+  const text = await r.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('O site está fora do ar ou em manutenção no momento. Tentando de novo…');
+  }
 }
 
 // ---------------------------------------------------------------- Painel da loja
@@ -123,12 +128,12 @@ function openPanel(target) {
   }
   panelSession();
   panel = new BrowserWindow({
-    width: 1340, height: 880, minWidth: 900, minHeight: 600, show: false, title: NAME,
+    width: 1340, height: 880, minWidth: 900, minHeight: 600, show: true, title: NAME,
     icon: icon('icon.png'), autoHideMenuBar: true, backgroundColor: '#FBF8F4',
-    webPreferences: { partition: PART, contextIsolation: true, sandbox: true, spellcheck: true },
+    // sem corretor ortográfico (baixava dicionários e deixava a digitação lenta)
+    webPreferences: { partition: PART, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: true },
   });
   panel.webContents.setUserAgent(panelSession().getUserAgent());
-  panel.once('ready-to-show', () => panel.show());
   panel.loadURL(url);
   const wc = panel.webContents;
   // Links de fora (WhatsApp, Instagram, Mercado Pago…) abrem no navegador; janelas da loja (cupom, impressão) abrem no app
