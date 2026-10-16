@@ -1,7 +1,7 @@
 {
   "name": "feliz-cristais-impressora",
   "productName": "Feliz Cristais Gestão",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Painel da loja Feliz Cristais no computador: avisos de pedidos e atendimento na hora, contador de pendências e impressão automática dos pedidos (Windows e Mac).",
   "main": "src/main.js",
   "author": "Feliz Cristais",
