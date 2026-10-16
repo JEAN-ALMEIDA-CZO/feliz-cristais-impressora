@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:">
+<title>Feliz Cristais Gestão · Atualização</title>
+<style>
+  :root{--gold:#c9a45c;--gold2:#b8862f;--ink:#f6efe4;--muted:rgba(246,239,228,.64);--card:rgba(255,255,255,.06);--line:rgba(255,255,255,.1)}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;display:flex;flex-direction:column;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);
+    background:radial-gradient(80% 50% at 100% 0%,rgba(201,164,92,.3),transparent 60%),linear-gradient(160deg,#211812,#2e2117 60%,#3a2a1b)}
+  header{display:flex;align-items:center;gap:16px;padding:24px 26px 18px}
+  .logo{position:relative;width:64px;height:64px;flex-shrink:0}
+  .logo img{width:64px;height:64px;border-radius:50%;box-shadow:0 0 0 2px rgba(201,164,92,.6),0 12px 30px -12px rgba(0,0,0,.6)}
+  .logo b{position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;color:#fff;
+    background:linear-gradient(135deg,#34c759,#248a3d);box-shadow:0 0 0 3px #2a1f16}
+  header h1{margin:0;font-size:19px;letter-spacing:-.01em}
+  header p{margin:2px 0 0;color:var(--muted)}
+  .vers{display:inline-flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px}
+  .vers span{padding:2px 9px;border-radius:999px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
+  .vers .new{background:rgba(201,164,92,.22);color:#f3dcaa;box-shadow:inset 0 0 0 1px rgba(201,164,92,.5);font-weight:700}
+  main{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 26px}
+  h2{margin:6px 0 10px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+  .notes{flex:1;min-height:0;overflow:auto;padding:4px 16px 8px;border-radius:16px;background:rgba(0,0,0,.22);box-shadow:inset 0 0 0 1px var(--line)}
+  .rel{padding:14px 0;border-bottom:1px solid var(--line)}.rel:last-child{border-bottom:0}
+  .rel-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .rel-head b{font-size:15px}.rel-head small{color:var(--muted)}
+  .rel h4{margin:10px 0 4px;font-size:13px;color:#f3dcaa}
+  .rel p{margin:4px 0;color:var(--ink)}
+  .rel ul{margin:4px 0;padding-left:18px}.rel li{margin:3px 0}
+  .rel code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:5px}
+  .rel .empty{color:var(--muted);font-style:italic}
+  .prog{margin:16px 0 4px;display:none}
+  .prog.on{display:block}
+  .bar{height:12px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+  .bar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--gold2),var(--gold),#f3dcaa,var(--gold));background-size:200% 100%;
+    transition:width .35s ease;animation:shine 1.6s linear infinite}
+  @keyframes shine{to{background-position:-200% 0}}
+  .prog-info{display:flex;justify-content:space-between;margin-top:6px;font-size:12.5px;color:var(--muted)}
+  .prog-info b{color:var(--ink)}
+  .msg{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);display:none}
+  .msg.on{display:block}.msg.ok{background:rgba(52,199,89,.12);box-shadow:inset 0 0 0 1px rgba(52,199,89,.4)}.msg.err{background:rgba(255,80,60,.12);box-shadow:inset 0 0 0 1px rgba(255,80,60,.4)}
+  footer{display:flex;gap:10px;justify-content:flex-end;align-items:center;padding:18px 26px 22px}
+  footer .grow{flex:1;color:var(--muted);font-size:12px}
+  button{border:0;border-radius:999px;padding:11px 20px;font:inherit;font-weight:700;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--gold),var(--gold2));box-shadow:0 10px 24px -14px rgba(201,164,92,.9)}
+  button.alt{background:rgba(255,255,255,.1);color:var(--ink);box-shadow:none}
+  button:disabled{opacity:.55;cursor:default}
+  [hidden]{display:none!important}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><img src="assets/icon.png" alt=""><b id="badge">⬆</b></div>
+  <div>
+    <h1 id="title">Nova versão disponível</h1>
+    <p id="sub">Uma atualização do Feliz Cristais Gestão está pronta para você.</p>
+    <div class="vers" id="vers"><span id="v-cur">2.0.0</span> → <span class="new" id="v-new">2.1.0</span></div>
+  </div>
+</header>
+<main>
+  <h2 id="notes-title">O que há de novo</h2>
+  <div class="notes" id="notes"><p class="rel empty">Carregando as novidades…</p></div>
+  <div class="prog" id="prog">
+    <div class="bar"><i id="bar"></i></div>
+    <div class="prog-info"><span id="p-pct"><b>0%</b></span><span id="p-size"></span><span id="p-speed"></span></div>
+  </div>
+  <div class="msg" id="msg"></div>
+</main>
+<footer>
+  <span class="grow" id="foot"></span>
+  <button class="alt" id="later">Lembrar mais tarde</button>
+  <button class="alt" id="close" hidden>Fechar</button>
+  <button id="install">Instalar agora</button>
+  <button id="restart" hidden>Reiniciar e instalar</button>
+  <button id="retry" hidden>Tentar de novo</button>
+</footer>
+<script src="update.js"></script>
+</body>
+</html>

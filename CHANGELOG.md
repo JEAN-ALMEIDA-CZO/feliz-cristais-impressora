@@ -1,0 +1,26 @@
+# Changelog — Feliz Cristais Gestão
+
+## 2.1.0
+- Tela de atualização com changelog, "Instalar agora" ou "Lembrar mais tarde", progresso do download e "Reiniciar e instalar".
+
+## 2.0.3
+- Painel abre na hora, sem corretor ortográfico (mais leve).
+- Mensagem clara quando o site está fora do ar ou em manutenção.
+
+## 2.0.2
+- Instalador fecha o app antigo antes de instalar, migra a pasta "Impressora" para "Feliz Cristais Gestão" e remove atalhos antigos.
+
+## 2.0.1
+- Instalador com a identidade do app de gestão.
+
+## 2.0.0
+- "Feliz Cristais Impressora" vira **Feliz Cristais Gestão**: painel da loja em janela própria, avisos com som (pedido novo, chat, mensagens), contador de pendências no ícone e menu com atalhos. A impressão automática continua.
+
+## 1.0.2
+- Instalador com a identidade da Feliz Cristais e QR code no cupom.
+
+## 1.0.1
+- Configuração automática pelo arquivo .fcprint do painel.
+
+## 1.0.0
+- Aplicativo de impressão de pedidos para Windows e Mac.

@@ -344,6 +344,7 @@ function updateTray() {
     { label: 'Imprimir teste', enabled: printReady(), click: () => printSample().catch((e) => addLog(e.message, 'error')) },
     { type: 'separator' },
     { label: 'Configurações', click: openWindow },
+    ...(['available', 'downloading', 'ready'].includes(upd.state) ? [{ label: upd.state === 'ready' ? `⬆ Versão ${upd.version} pronta: reiniciar e instalar` : upd.state === 'downloading' ? `⬇ Baixando a versão ${upd.version}…` : `⬆ Nova versão ${upd.version} disponível`, click: openUpdateWindow }] : []),
     { label: 'Procurar atualizações', click: () => checkUpdates(true) },
     { label: `Versão ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
@@ -355,25 +356,186 @@ function applyAutostart() {
   app.setLoginItemSettings({ openAtLogin: !!config.autostart, openAsHidden: true, args: ['--hidden'] });
 }
 
-// ---------------------------------------------------------------- Atualização automática (GitHub)
+// ---------------------------------------------------------------- Atualização (GitHub) com tela própria
+// Versão nova: abre a tela com o changelog → "Instalar agora" (barra de progresso do download) ou "Lembrar mais tarde".
+const REPO = 'JEAN-ALMEIDA-CZO/feliz-cristais-impressora';
+let upd = { state: 'idle', version: null, date: null, notes: [], progress: null, error: null, manual: false };
+let updWin = null;
+
 function checkUpdates(manual = false) {
+  if (!app.isPackaged && process.env.FC_UPD_DEMO) return updDemo(); // simulação para testar a tela (desenvolvimento)
   if (!app.isPackaged) {
-    if (manual) addLog('Atualização automática funciona só na versão instalada.');
+    if (manual) {
+      addLog('Atualização automática funciona só na versão instalada.');
+      upd = { ...upd, state: 'dev', manual: true };
+      openUpdateWindow();
+    }
     return;
   }
-  autoUpdater.checkForUpdates().catch((e) => manual && addLog('Não foi possível procurar atualizações: ' + e.message, 'error'));
+  if (['downloading', 'ready'].includes(upd.state)) {
+    if (manual) openUpdateWindow();
+    return;
+  }
+  upd.manual = manual;
+  if (manual) {
+    upd = { ...upd, state: 'checking', error: null };
+    openUpdateWindow();
+  }
+  autoUpdater.checkForUpdates().catch((e) => {
+    if (manual) {
+      upd = { ...upd, state: 'error', error: 'Não foi possível procurar atualizações: ' + (e.message || e) };
+      sendUpd();
+    }
+  });
 }
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false; // só baixa quando a pessoa escolher "Instalar agora"
 autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.on('update-available', (i) => addLog(`Nova versão ${i.version} encontrada. Baixando…`));
-autoUpdater.on('update-not-available', () => addLog(`Você está na versão mais nova (${app.getVersion()}).`));
-autoUpdater.on('update-downloaded', (i) => {
-  addLog(`Versão ${i.version} pronta. Instalando…`, 'ok');
-  // Instala sem atrapalhar: espera não haver impressão em andamento nem o painel em uso
-  const go = () => (busy || (panel && !panel.isDestroyed() && panel.isFocused()) ? setTimeout(go, 30000) : (app.isQuitting = true, autoUpdater.quitAndInstall(true, true)));
-  setTimeout(go, 5000);
+
+/** Compara versões: "2.1.0" é mais nova que "2.0.3". */
+function newer(a, b) {
+  const x = String(a).split('.').map(Number);
+  const y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  }
+  return false;
+}
+/** Markdown simples (títulos, listas, negrito, código) para HTML seguro. */
+function md(text) {
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '$1');
+  let html = '';
+  let list = false;
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trimEnd();
+    const li = line.match(/^\s*[-*•]\s+(.*)$/);
+    if (li) {
+      if (!list) { html += '<ul>'; list = true; }
+      html += `<li>${inline(li[1])}</li>`;
+      continue;
+    }
+    if (list) { html += '</ul>'; list = false; }
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) html += `<h4>${inline(h[2])}</h4>`;
+    else if (line.trim()) html += `<p>${inline(line)}</p>`;
+  }
+  return list ? html + '</ul>' : html;
+}
+/** Changelog: versões publicadas depois da instalada (GitHub Releases), da mais nova para a mais antiga. */
+async function releaseNotes(info, from = app.getVersion()) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': `FCGestao/${app.getVersion()}` }, signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok) {
+      const list = (await r.json()).filter((x) => !x.draft && newer(String(x.tag_name).replace(/^v/, ''), from));
+      const notes = list.map((x) => ({ version: String(x.tag_name).replace(/^v/, ''), date: x.published_at, html: md(x.body) }))
+        .filter((n) => !newer(n.version, info.version));
+      if (notes.length) return notes;
+    }
+  } catch (e) {
+    // sem acesso à API: usa as notas que vieram com a atualização
+  }
+  const rn = info.releaseNotes;
+  if (Array.isArray(rn)) return rn.map((n) => ({ version: n.version, date: null, html: md(String(n.note || '').replace(/<[^>]+>/g, '')) }));
+  return [{ version: info.version, date: info.releaseDate, html: rn ? md(String(rn).replace(/<[^>]+>/g, '')) : '' }];
+}
+function sendUpd() {
+  if (updWin && !updWin.isDestroyed()) updWin.webContents.send('upd', { ...upd, current: app.getVersion() });
+  updateTray();
+}
+function openUpdateWindow() {
+  if (updWin && !updWin.isDestroyed()) {
+    sendUpd();
+    updWin.show();
+    updWin.focus();
+    return;
+  }
+  updWin = new BrowserWindow({
+    width: 560, height: 660, minWidth: 460, minHeight: 480, title: `${NAME} · Atualização`, icon: icon('icon.png'),
+    autoHideMenuBar: true, backgroundColor: '#1d1610', show: false, maximizable: false,
+    webPreferences: { preload: path.join(__dirname, 'update-preload.js'), contextIsolation: true, sandbox: true },
+  });
+  updWin.loadFile(path.join(__dirname, 'update.html'));
+  updWin.once('ready-to-show', () => { updWin.show(); updWin.focus(); });
+  updWin.on('closed', () => { updWin = null; });
+}
+autoUpdater.on('update-available', async (i) => {
+  addLog(`Nova versão ${i.version} disponível.`);
+  upd = { ...upd, state: 'available', version: i.version, date: i.releaseDate, notes: await releaseNotes(i), error: null };
+  const snooze = config.updSnooze || {};
+  const snoozed = snooze.version === i.version && snooze.until > Date.now();
+  if (upd.manual || !snoozed) openUpdateWindow();
+  sendUpd();
 });
-autoUpdater.on('error', (e) => addLog('Atualização: ' + (e && e.message ? e.message : e), 'error'));
+autoUpdater.on('update-not-available', () => {
+  addLog(`Você está na versão mais nova (${app.getVersion()}).`);
+  if (upd.manual) {
+    upd = { ...upd, state: 'latest' };
+    sendUpd();
+  }
+});
+autoUpdater.on('download-progress', (p) => {
+  upd = { ...upd, state: 'downloading', progress: { percent: p.percent, transferred: p.transferred, total: p.total, speed: p.bytesPerSecond } };
+  if (updWin && !updWin.isDestroyed()) {
+    updWin.setProgressBar(Math.max(0, Math.min(1, p.percent / 100)));
+    updWin.webContents.send('upd', { ...upd, current: app.getVersion() });
+  }
+  if (tray) tray.setToolTip(`${NAME} · baixando a versão ${upd.version}: ${Math.round(p.percent)}%`);
+});
+autoUpdater.on('update-downloaded', (i) => {
+  addLog(`Versão ${i.version} baixada e pronta para instalar.`, 'ok');
+  upd = { ...upd, state: 'ready', progress: { ...(upd.progress || {}), percent: 100 } };
+  if (updWin && !updWin.isDestroyed()) updWin.setProgressBar(-1);
+  openUpdateWindow();
+  sendUpd();
+});
+autoUpdater.on('error', (e) => {
+  const msg = e && e.message ? e.message : String(e);
+  addLog('Atualização: ' + msg, 'error');
+  if (upd.state === 'downloading' || upd.manual) {
+    upd = { ...upd, state: 'error', error: 'Não foi possível concluir a atualização. Verifique a internet e tente de novo.' };
+    if (updWin && !updWin.isDestroyed()) updWin.setProgressBar(-1);
+    sendUpd();
+  }
+});
+/** Desenvolvimento: simula versão nova, download e "pronto para instalar" (FC_UPD_DEMO=1). */
+async function updDemo() {
+  const version = process.env.FC_UPD_DEMO.includes('.') ? process.env.FC_UPD_DEMO : '9.9.9';
+  upd = { ...upd, state: 'available', version, date: new Date().toISOString(), notes: await releaseNotes({ version, releaseNotes: '' }, process.env.FC_UPD_FROM || '1.0.0'), error: null };
+  openUpdateWindow();
+  sendUpd();
+  autoUpdater.downloadUpdate = async () => {
+    const total = 82 * 1048576;
+    for (let p = 0; p <= 100; p += 4) {
+      await new Promise((r) => setTimeout(r, 180));
+      autoUpdater.emit('download-progress', { percent: p, transferred: total * p / 100, total, bytesPerSecond: 6.4 * 1048576 });
+    }
+    autoUpdater.emit('update-downloaded', { version });
+  };
+}
+ipcMain.handle('upd:get', () => ({ ...upd, current: app.getVersion() }));
+ipcMain.handle('upd:download', () => {
+  if (upd.state !== 'available' && upd.state !== 'error') return;
+  upd = { ...upd, state: 'downloading', progress: { percent: 0, transferred: 0, total: 0, speed: 0 }, error: null };
+  sendUpd();
+  autoUpdater.downloadUpdate().catch(() => {});
+});
+ipcMain.handle('upd:later', () => {
+  config.updSnooze = { version: upd.version, until: Date.now() + 4 * 60 * 60 * 1000 }; // lembra de novo em 4 horas
+  saveConfig();
+  addLog(`Atualização ${upd.version}: lembrar mais tarde.`);
+  if (updWin && !updWin.isDestroyed()) updWin.close();
+});
+ipcMain.handle('upd:restart', () => {
+  if (!app.isPackaged) { addLog('Simulação: aqui o app reiniciaria e instalaria.'); return; }
+  // Espera terminar uma impressão em andamento
+  const go = () => (busy ? setTimeout(go, 1500) : (app.isQuitting = true, autoUpdater.quitAndInstall(true, true)));
+  go();
+});
+ipcMain.handle('upd:check', () => checkUpdates(true));
+ipcMain.handle('upd:close', () => updWin && !updWin.isDestroyed() && updWin.close());
 
 // ---------------------------------------------------------------- Comunicação com a janela de configurações
 ipcMain.handle('get', async () => ({ config, state, log, version: app.getVersion(), printers: await listPrinters(), alerts }));
