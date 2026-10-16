@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.1.1
+- Changelog publicado na página da versão no GitHub e exibido na tela de atualização.
+
 ## 2.1.0
 - Tela de atualização com changelog, "Instalar agora" ou "Lembrar mais tarde", progresso do download e "Reiniciar e instalar".
 

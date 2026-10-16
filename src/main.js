@@ -430,8 +430,10 @@ async function releaseNotes(info, from = app.getVersion()) {
     });
     if (r.ok) {
       const list = (await r.json()).filter((x) => !x.draft && newer(String(x.tag_name).replace(/^v/, ''), from));
+      const own = typeof info.releaseNotes === 'string' ? md(info.releaseNotes.replace(/<[^>]+>/g, '')) : '';
       const notes = list.map((x) => ({ version: String(x.tag_name).replace(/^v/, ''), date: x.published_at, html: md(x.body) }))
-        .filter((n) => !newer(n.version, info.version));
+        .filter((n) => !newer(n.version, info.version))
+        .map((n) => (!n.html && n.version === info.version && own ? { ...n, html: own } : n)); // descrição vazia no GitHub: usa as notas da atualização
       if (notes.length) return notes;
     }
   } catch (e) {
