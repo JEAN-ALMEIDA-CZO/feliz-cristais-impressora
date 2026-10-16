@@ -131,23 +131,23 @@ function panelSession() {
       onState: (on, pending) => {
         updateTray();
         if (on) {
-          panelToast({ title: 'Internet de volta ✨', text: pending ? `Enviando ${pending} alteração(ões) guardada(s) no app…` : 'O painel está atualizado com a loja.', type: 'ok' });
+          panelToast({ title: 'Internet de volta', text: pending ? `Enviando ${pending} alteração(ões) guardada(s) no app…` : 'O painel está atualizado com a loja.', type: 'online' });
           removeBanner();
         } else {
-          panelToast({ title: 'Sem internet', text: 'O app continua funcionando com os dados salvos. O que você salvar fica guardado e é enviado quando a conexão voltar.', type: 'warn', duration: 9000 });
+          panelToast({ title: 'Sem internet', text: 'O app continua funcionando com os dados salvos. O que você salvar fica guardado e é enviado quando a conexão voltar.', type: 'offline', duration: 9000 });
           showBanner();
           if (!panel || panel.isDestroyed() || !panel.isFocused()) notify('Sem internet', 'O app continua com os dados salvos e envia suas alterações quando a conexão voltar.');
         }
       },
       onQueued: (n, nav) => {
         updateTray();
-        const t = { title: 'Guardado no app', text: `Sem internet: a alteração foi guardada (${n} na fila) e será enviada ao sistema quando a conexão voltar.`, type: 'warn', duration: 8000 };
+        const t = { title: 'Guardado no app', text: `Sem internet: a alteração foi guardada (${n} na fila) e será enviada ao sistema quando a conexão voltar.`, type: 'queued', duration: 8000 };
         if (nav && panel && !panel.isDestroyed()) panel.webContents.once('did-finish-load', () => setTimeout(() => panelToast(t), 200)); else panelToast(t);
       },
       onSynced: (sent, failed, left) => {
         updateTray();
         if (sent || failed) {
-          const t = { title: sent ? 'Carga enviada ✓' : 'Carga com problemas', text: `${sent} alteração(ões) feita(s) sem internet gravada(s) no sistema${failed ? ` · ${failed} recusada(s) pelo servidor (confira os dados)` : ''}${left ? ` · ${left} aguardando` : ''}.`, type: failed ? 'warn' : 'ok', duration: 9000 };
+          const t = { title: sent ? 'Carga enviada' : 'Carga com problemas', text: `${sent} alteração(ões) feita(s) sem internet gravada(s) no sistema${failed ? ` · ${failed} recusada(s) pelo servidor (confira os dados)` : ''}${left ? ` · ${left} aguardando` : ''}.`, type: failed ? 'warn' : 'sync', duration: 9000 };
           if (sent && panel && !panel.isDestroyed()) {
             panel.webContents.once('did-finish-load', () => setTimeout(() => panelToast(t), 300));
             panel.webContents.reload(); // mostra os dados já atualizados
