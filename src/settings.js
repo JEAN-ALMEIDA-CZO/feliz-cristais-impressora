@@ -1,3 +1,22 @@
+// Dentro do painel: abre como lightbox
+(function () {
+  if (!/[?&]lightbox=1/.test(location.search)) return;
+  var html = document.documentElement;
+  html.classList.add('lightbox');
+  var card = document.createElement('div');
+  card.className = 'lb-card';
+  while (document.body.firstChild) card.appendChild(document.body.firstChild);
+  var x = document.createElement('button');
+  x.type = 'button'; x.className = 'lb-x'; x.setAttribute('aria-label', 'Fechar'); x.textContent = '×';
+  card.insertBefore(x, card.firstChild);
+  document.body.appendChild(card);
+  var close = function () { html.classList.add('lb-out'); setTimeout(function () { window.fc.close(); }, 220); };
+  x.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  document.body.addEventListener('mousedown', function (e) { if (e.target === document.body) close(); });
+  var openPanel = document.getElementById('panel');
+  if (openPanel) openPanel.hidden = true; // já está no painel
+})();
 (function () {
   var f = document.getElementById('f');
   var $ = function (id) { return document.getElementById(id); };

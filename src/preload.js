@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('fc', {
   update: () => ipcRenderer.invoke('update'),
   panel: () => ipcRenderer.invoke('panel'),
   about: () => ipcRenderer.invoke('about:show'),
+  close: () => ipcRenderer.invoke('settings:close'),
   open: (url) => ipcRenderer.invoke('open', url),
   on: (channel, fn) => {
     if (['state', 'log', 'config'].includes(channel)) ipcRenderer.on(channel, (_e, data) => fn(data));

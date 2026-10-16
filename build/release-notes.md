@@ -1,4 +1,5 @@
 ## Novidades
-- **Tela de abertura animada**: ao abrir o app aparece a logo da Feliz Cristais com anel dourado girando e brilhos, enquanto o painel carrega ("Conectando à loja…"). Some sozinha quando o painel está pronto.
-- **Barra de menus** na janela do painel: Painel (atalhos Ctrl+1 a Ctrl+5), Impressora (configurações Ctrl+,, imprimir teste, fila), Exibir (recarregar, zoom, tela cheia) e Suporte.
-- **Tela de Suporte**: versão do app, "Desenvolvido por Jean Almeida" e botões para GitHub, Portfólio, LinkedIn, Instagram e WhatsApp.
+- **Configurações da impressora em lightbox**: abrem dentro da própria janela do painel, sobre a tela (fecha no ×, no Esc ou clicando fora).
+- **Menu do painel confere o login**: sem login, o app mostra um aviso no topo ("Faça login para continuar") e a tela de entrar.
+- **Avisos com a logo da loja**: o painel mostra os avisos no topo, com a logo, barra de tempo e o tipo (pedido, chat, mensagem…). Com a janela em foco o aviso aparece dentro do painel; com o app em segundo plano, como notificação do sistema.
+- **Login guardado**: ao fechar e abrir o app você continua conectado (por até 12 horas sem uso).

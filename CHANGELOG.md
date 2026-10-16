@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.3.0
+- Configurações da impressora em lightbox, menu confere o login, avisos com a logo e login guardado entre aberturas.
+
 ## 2.2.1
 - Tela de abertura (splash) animada enquanto o painel carrega.
 

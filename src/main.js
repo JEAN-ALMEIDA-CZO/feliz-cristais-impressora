@@ -7,7 +7,7 @@
  * - Imprime sozinho os pedidos na impressora escolhida (fila do site, sem janela de confirmação).
  * - Se atualiza sozinho pelas versões publicadas no GitHub.
  */
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, Notification, shell, dialog, session } = require('electron');
+const { app, BrowserWindow, WebContentsView, Tray, Menu, ipcMain, nativeImage, Notification, shell, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -58,6 +58,7 @@ function addLog(text, kind = 'info') {
 }
 function send(channel, data) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, data);
+  if (settingsView && !settingsView.webContents.isDestroyed()) settingsView.webContents.send(channel, data);
 }
 function setState(patch) {
   const was = state.online;
@@ -110,6 +111,14 @@ function panelSession() {
     // Avisos ficam com o aplicativo (notificação nativa); a página não pede permissão própria
     ses.setPermissionRequestHandler((_wc, perm, cb) => cb(['clipboard-sanitized-write', 'fullscreen', 'media'].includes(perm)));
     ses.setPermissionCheckHandler((_wc, perm) => perm !== 'notifications');
+    // Login guardado entre aberturas do app: o cookie de sessão da loja passa a durar 12 horas (igual ao servidor)
+    ses.cookies.on('changed', (_e, c, _cause, removed) => {
+      if (removed || !c.session || c.name !== 'fcsess' || !config.site) return;
+      ses.cookies.set({ url: siteBase(), name: c.name, value: c.value, path: c.path, domain: c.hostOnly ? undefined : c.domain, httpOnly: c.httpOnly, secure: c.secure,
+        sameSite: c.sameSite, expirationDate: Math.floor(Date.now() / 1000) + 12 * 3600 })
+        .then(() => ses.cookies.flushStore())
+        .catch((err) => process.env.FC_DEBUG_LOG && fs.appendFileSync(process.env.FC_DEBUG_LOG, 'cookie: ' + err.message + '\n'));
+    });
     // O painel no app não usa service worker (cache offline/push do navegador); limpa o que houver
     ses.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }).catch(() => {});
   }
@@ -197,6 +206,7 @@ function openPanel(target) {
   });
   wc.on('page-title-updated', () => updateTray());
   panel.on('focus', () => { panel.flashFrame(false); pollAlerts(); });
+  panel.webContents.on('did-start-navigation', (_e, _u, inPlace, isMain) => { if (isMain && !inPlace && settingsView) closeSettings(); });
   panel.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
@@ -235,6 +245,7 @@ async function pollAlerts() {
 }
 function showAlert(ev) {
   if (process.env.FC_DEBUG_LOG) fs.appendFileSync(process.env.FC_DEBUG_LOG, JSON.stringify(ev) + '\n');
+  if (panel && !panel.isDestroyed() && panel.isVisible() && panel.isFocused() && alerts.logged) return; // o painel mostra o toast
   if (!Notification.isSupported()) return;
   const n = new Notification({ title: ev.title || NAME, body: ev.text || '', icon: path.join(__dirname, 'assets', 'icon.png'), silent: !config.sound });
   n.on('click', () => openPanel(ev.url));
@@ -375,7 +386,7 @@ function updateTray() {
     ...(state.last ? [{ label: `Último impresso: ${state.last}`, enabled: false }] : []),
     { label: 'Imprimir teste', enabled: printReady(), click: () => printSample().catch((e) => addLog(e.message, 'error')) },
     { type: 'separator' },
-    { label: 'Configurações', click: openWindow },
+    { label: 'Configurações da impressora', click: openSettings },
     ...(['available', 'downloading', 'ready'].includes(upd.state) ? [{ label: upd.state === 'ready' ? `⬆ Versão ${upd.version} pronta: reiniciar e instalar` : upd.state === 'downloading' ? `⬇ Baixando a versão ${upd.version}…` : `⬆ Nova versão ${upd.version} disponível`, click: openUpdateWindow }] : []),
     { label: 'Procurar atualizações', click: () => checkUpdates(true) },
     { label: 'Suporte e contato do desenvolvedor', click: openAbout },
@@ -573,6 +584,84 @@ ipcMain.handle('upd:restart', () => {
 ipcMain.handle('upd:check', () => checkUpdates(true));
 ipcMain.handle('upd:close', () => updWin && !updWin.isDestroyed() && updWin.close());
 
+// ---------------------------------------------------------------- Toast dentro do painel, login e configurações em lightbox
+/** Mostra o toast com a logo da loja dentro da janela do painel (o mesmo do site). */
+function panelToast(o) {
+  if (!panel || panel.isDestroyed()) return;
+  const wc = panel.webContents;
+  const run = () => wc.executeJavaScript(`window.FCToast ? FCToast.show(${JSON.stringify(o)}) : null`).catch(() => {});
+  if (wc.isLoading()) wc.once('did-finish-load', () => setTimeout(run, 150)); else run();
+}
+/** Confere se a equipe está logada no painel (sessão do app). */
+async function isLogged() {
+  if (!config.site) return false;
+  try {
+    const r = await panelSession().fetch(`${siteBase()}/admin/notify.php`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    alerts.logged = r.status !== 401;
+    return alerts.logged;
+  } catch (e) {
+    return alerts.logged !== false; // sem internet: deixa tentar abrir
+  }
+}
+/** Itens do menu: só abre a página com login; sem login, mostra o aviso e a tela de entrar. */
+async function openSecure(p) {
+  if (!config.site) {
+    openSettings();
+    return;
+  }
+  if (await isLogged()) {
+    openPanel(p);
+    return;
+  }
+  const onLogin = panel && !panel.isDestroyed() && /\/admin\/login/.test(panel.webContents.getURL());
+  if (!onLogin) openPanel('admin/login.php'); else openPanel();
+  panelToast({ title: 'Faça login para continuar', text: 'Entre com seu e-mail e senha do painel para abrir esta área.', type: 'warn', duration: 6000 });
+  updateTray();
+}
+
+let settingsView = null;
+let settingsFit = null;
+/** Configurações da impressora: lightbox dentro da janela do painel (sem painel aberto, janela própria). */
+function openSettings() {
+  if (!panel || panel.isDestroyed() || !panel.isVisible() || !WebContentsView) {
+    openWindow();
+    return;
+  }
+  if (panel.isMinimized()) panel.restore();
+  panel.focus();
+  if (settingsView) {
+    settingsView.webContents.focus();
+    return;
+  }
+  settingsView = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true } });
+  settingsView.setBackgroundColor('#00000000');
+  panel.contentView.addChildView(settingsView);
+  settingsFit = () => {
+    if (!settingsView || panel.isDestroyed()) return;
+    const [w, h] = panel.getContentSize();
+    settingsView.setBounds({ x: 0, y: 0, width: w, height: h });
+  };
+  settingsFit();
+  panel.on('resize', settingsFit);
+  settingsView.webContents.loadFile(path.join(__dirname, 'settings.html'), { query: { lightbox: '1' } });
+  settingsView.webContents.once('did-finish-load', () => settingsView && settingsView.webContents.focus());
+}
+function closeSettings() {
+  if (!settingsView) return;
+  const v = settingsView;
+  settingsView = null;
+  if (panel && !panel.isDestroyed()) {
+    panel.removeListener('resize', settingsFit);
+    panel.contentView.removeChildView(v);
+    panel.webContents.focus();
+  }
+  if (!v.webContents.isDestroyed()) v.webContents.close();
+}
+ipcMain.handle('settings:close', (e) => {
+  if (settingsView && e.sender === settingsView.webContents) closeSettings();
+  else if (win && !win.isDestroyed()) win.close();
+});
+
 // ---------------------------------------------------------------- Menu da janela do painel e tela Suporte/Sobre
 const DEV = {
   name: 'Jean Almeida',
@@ -606,7 +695,7 @@ ipcMain.handle('about:get', () => ({ version: app.getVersion(), dev: DEV.name, s
 ipcMain.handle('about:open', (_e, key) => DEV.links[key] && shell.openExternal(DEV.links[key]));
 
 function panelMenu() {
-  const go = (p) => () => openPanel(p);
+  const go = (p) => () => openSecure(p);
   const wc = () => (panel && !panel.isDestroyed() ? panel.webContents : null);
   return Menu.buildFromTemplate([
     ...(process.platform === 'darwin' ? [{ label: NAME, submenu: [{ label: `Sobre o ${NAME}`, click: openAbout }, { type: 'separator' }, { role: 'hide', label: 'Ocultar' }, { type: 'separator' }, { label: 'Sair', accelerator: 'Cmd+Q', click: () => { app.isQuitting = true; app.quit(); } }] }] : []),
@@ -629,7 +718,7 @@ function panelMenu() {
     {
       label: 'Impressora',
       submenu: [
-        { label: 'Configurações da impressora…', accelerator: 'CmdOrCtrl+,', click: openWindow },
+        { label: 'Configurações da impressora…', accelerator: 'CmdOrCtrl+,', click: openSettings },
         { label: 'Imprimir teste', click: () => printSample().catch((e) => { addLog(e.message, 'error'); dialog.showMessageBox(panel, { type: 'warning', title: 'Impressão', message: e.message }); }) },
         { label: 'Fila e status no painel', click: go('admin/impressao.php') },
         { type: 'separator' },
@@ -795,6 +884,8 @@ app.whenReady().then(() => {
   startLoop();
   startAlerts();
   if (!app.isPackaged && process.env.FC_OPEN_ABOUT) openAbout(); // teste da tela de suporte (desenvolvimento)
+  if (!app.isPackaged && process.env.FC_TEST_SECURE) setTimeout(() => openSecure('admin/orders.php'), 4000); // teste (desenvolvimento)
+  if (!app.isPackaged && process.env.FC_TEST_SETTINGS) setTimeout(openSettings, Number(process.env.FC_TEST_SETTINGS)); // teste (desenvolvimento)
   checkUpdates();
   setInterval(checkUpdates, 6 * 60 * 60 * 1000); // procura atualização a cada 6 horas
 });
