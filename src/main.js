@@ -83,6 +83,54 @@ function sameSite(url) {
     return false;
   }
 }
+/**
+ * Abre um link de fora do sistema no navegador padrão.
+ * Links do WhatsApp (wa.me, api.whatsapp.com) vão direto para o WhatsApp Web, que já fica conectado no navegador.
+ */
+function openOut(u) {
+  if (!/^https?:|^mailto:|^tel:/.test(u)) return;
+  try {
+    const x = new URL(u);
+    const host = x.hostname.replace(/^www\./, '');
+    let phone = '', text = x.searchParams.get('text') || '';
+    if (host === 'wa.me') phone = x.pathname.replace(/\D/g, '');
+    else if (host === 'api.whatsapp.com' || (host === 'whatsapp.com' && x.pathname.startsWith('/send'))) phone = (x.searchParams.get('phone') || '').replace(/\D/g, '');
+    if (host === 'wa.me' || host === 'api.whatsapp.com' || (host === 'whatsapp.com' && x.pathname.startsWith('/send'))) {
+      u = 'https://web.whatsapp.com/send?' + (phone ? 'phone=' + phone + '&' : '') + 'text=' + encodeURIComponent(text);
+    }
+  } catch (e) { /* mantém o link como veio */ }
+  shell.openExternal(u);
+}
+/** Saindo do site (link, redirecionamento do servidor ou janela nova): abre no navegador e não no app. */
+function guardContents(wc, isChild) {
+  const out = (e, u) => {
+    if (sameSite(u) || !/^https?:|^mailto:|^tel:/.test(u)) return;
+    e.preventDefault();
+    openOut(u);
+    const cur = wc.getURL();
+    // Janela aberta só para redirecionar (ex.: agradecer pelo WhatsApp): fecha sozinha
+    if (isChild && (!cur || cur === 'about:blank' || !sameSite(cur))) {
+      const w = BrowserWindow.fromWebContents(wc);
+      if (w && !w.isDestroyed()) setTimeout(() => w.close(), 50);
+    }
+  };
+  wc.on('will-navigate', out);
+  wc.on('will-redirect', out);
+}
+app.on('web-contents-created', (_e, wc) => {
+  // Janelas filhas (cupom, impressão…): mesma regra do painel
+  if (wc.getType() === 'window') {
+    setImmediate(() => {
+      if (panel && !panel.isDestroyed() && wc === panel.webContents) return;
+      guardContents(wc, true);
+      wc.setWindowOpenHandler(({ url: u }) => {
+        if (sameSite(u)) return { action: 'allow' };
+        openOut(u);
+        return { action: 'deny' };
+      });
+    });
+  }
+});
 function apiUrl(action, extra = '') {
   return `${siteBase()}/admin/print_api.php?action=${action}&station=${encodeURIComponent(os.hostname())}${extra}`;
 }
@@ -240,15 +288,10 @@ function openPanel(target) {
   // Links de fora (WhatsApp, Instagram, Mercado Pago…) abrem no navegador; janelas da loja (cupom, impressão) abrem no app
   wc.setWindowOpenHandler(({ url: u }) => {
     if (sameSite(u) && /\/admin\//.test(new URL(u).pathname)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: icon('icon.png'), webPreferences: { partition: PART, sandbox: true } } };
-    if (/^https?:|^mailto:|^tel:/.test(u)) shell.openExternal(u);
+    openOut(u);
     return { action: 'deny' };
   });
-  wc.on('will-navigate', (e, u) => {
-    if (!sameSite(u)) {
-      e.preventDefault();
-      if (/^https?:|^mailto:|^tel:/.test(u)) shell.openExternal(u);
-    }
-  });
+  guardContents(wc, false);
   wc.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')) { wc.reload(); e.preventDefault(); }
@@ -767,7 +810,7 @@ function openAbout() {
 }
 ipcMain.handle('about:show', () => openAbout());
 ipcMain.handle('about:get', () => ({ version: app.getVersion(), dev: DEV.name, store: siteBase() }));
-ipcMain.handle('about:open', (_e, key) => DEV.links[key] && shell.openExternal(DEV.links[key]));
+ipcMain.handle('about:open', (_e, key) => DEV.links[key] && openOut(DEV.links[key]));
 
 function panelMenu() {
   const go = (p) => () => openSecure(p);
@@ -816,7 +859,7 @@ function panelMenu() {
     {
       label: 'Suporte',
       submenu: [
-        { label: 'Falar com o suporte (WhatsApp)', click: () => shell.openExternal(DEV.links.whatsapp) },
+        { label: 'Falar com o suporte (WhatsApp)', click: () => openOut(DEV.links.whatsapp) },
         { label: 'Sobre e contato do desenvolvedor…', click: openAbout },
         { type: 'separator' },
         { label: 'Procurar atualizações', click: () => checkUpdates(true) },

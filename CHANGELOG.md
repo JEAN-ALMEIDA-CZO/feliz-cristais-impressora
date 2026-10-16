@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.4.3
+- Agradecimento e demais links de WhatsApp abrem no WhatsApp Web do navegador (antes abria janela com erro 4xx); redirecionamentos para fora do sistema abrem no navegador.
+
 ## 2.4.2
 - Avisos de conexão com ícones próprios (sem internet, internet de volta, guardado no app, carga enviada) e sem emojis.
 
