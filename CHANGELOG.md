@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.4.0
+- Modo offline: cópia local do painel, carga do que foi salvo sem internet enviada ao voltar a conexão; correção da tela branca.
+
 ## 2.3.0
 - Configurações da impressora em lightbox, menu confere o login, avisos com a logo e login guardado entre aberturas.
 

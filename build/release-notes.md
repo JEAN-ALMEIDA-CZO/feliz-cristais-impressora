@@ -1,5 +1,8 @@
 ## Novidades
-- **Configurações da impressora em lightbox**: abrem dentro da própria janela do painel, sobre a tela (fecha no ×, no Esc ou clicando fora).
-- **Menu do painel confere o login**: sem login, o app mostra um aviso no topo ("Faça login para continuar") e a tela de entrar.
-- **Avisos com a logo da loja**: o painel mostra os avisos no topo, com a logo, barra de tempo e o tipo (pedido, chat, mensagem…). Com a janela em foco o aviso aparece dentro do painel; com o app em segundo plano, como notificação do sistema.
-- **Login guardado**: ao fechar e abrir o app você continua conectado (por até 12 horas sem uso).
+- **Funciona sem internet**: o app guarda no computador uma cópia das páginas do painel e dos arquivos que você abre (e das principais páginas logo após o login). Se a internet cair, ele avisa e continua mostrando os dados salvos.
+- **Carga do que foi feito sem internet**: o que você salvar sem conexão (cadastros, edições, mudanças de pedido…) fica guardado no app. Quando a internet volta, tudo é enviado ao sistema, em ordem, e gravado no banco de dados, com aviso de quantas alterações foram enviadas.
+- **Avisos de conexão**: faixa "Sem internet" na parte de baixo do painel, avisos no topo quando cai e quando volta, e o menu ao lado do relógio mostra o estado e as alterações aguardando envio.
+
+## Correções
+- Corrigida a **tela branca** ao abrir o site da loja pelo painel: as páginas da loja agora abrem no navegador.
+- Se uma página do painel travar, o app recarrega sozinho.

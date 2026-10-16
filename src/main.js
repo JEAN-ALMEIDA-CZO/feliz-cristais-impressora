@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
+const Offline = require('./offline');
 
 const NAME = 'Feliz Cristais Gestão';
 const PART = 'persist:painel';
@@ -121,8 +122,68 @@ function panelSession() {
     });
     // O painel no app não usa service worker (cache offline/push do navegador); limpa o que houver
     ses.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }).catch(() => {});
+    // Modo offline: cópia local do que foi aberto + carga do que for salvo sem internet
+    off = Offline.create({
+      session: ses, userData: app.getPath('userData'), siteBase,
+      offlinePage: () => fs.readFileSync(path.join(__dirname, 'offline.html'), 'utf8')
+        .replace('Sem conexão com a loja', 'Sem internet')
+        .replace(/<p>[\s\S]*?<\/p>/, '<p>Esta página ainda não foi aberta com internet neste computador. As páginas que você já abriu continuam disponíveis; o que você salvar fica guardado no app e é enviado quando a conexão voltar.</p>'),
+      onState: (on, pending) => {
+        updateTray();
+        if (on) {
+          panelToast({ title: 'Internet de volta ✨', text: pending ? `Enviando ${pending} alteração(ões) guardada(s) no app…` : 'O painel está atualizado com a loja.', type: 'ok' });
+          removeBanner();
+        } else {
+          panelToast({ title: 'Sem internet', text: 'O app continua funcionando com os dados salvos. O que você salvar fica guardado e é enviado quando a conexão voltar.', type: 'warn', duration: 9000 });
+          showBanner();
+          if (!panel || panel.isDestroyed() || !panel.isFocused()) notify('Sem internet', 'O app continua com os dados salvos e envia suas alterações quando a conexão voltar.');
+        }
+      },
+      onQueued: (n, nav) => {
+        updateTray();
+        const t = { title: 'Guardado no app', text: `Sem internet: a alteração foi guardada (${n} na fila) e será enviada ao sistema quando a conexão voltar.`, type: 'warn', duration: 8000 };
+        if (nav && panel && !panel.isDestroyed()) panel.webContents.once('did-finish-load', () => setTimeout(() => panelToast(t), 200)); else panelToast(t);
+      },
+      onSynced: (sent, failed, left) => {
+        updateTray();
+        if (sent || failed) {
+          const t = { title: sent ? 'Carga enviada ✓' : 'Carga com problemas', text: `${sent} alteração(ões) feita(s) sem internet gravada(s) no sistema${failed ? ` · ${failed} recusada(s) pelo servidor (confira os dados)` : ''}${left ? ` · ${left} aguardando` : ''}.`, type: failed ? 'warn' : 'ok', duration: 9000 };
+          if (sent && panel && !panel.isDestroyed()) {
+            panel.webContents.once('did-finish-load', () => setTimeout(() => panelToast(t), 300));
+            panel.webContents.reload(); // mostra os dados já atualizados
+          } else panelToast(t);
+          if (!panel || panel.isDestroyed() || !panel.isFocused()) notify('Alterações enviadas', `${sent} alteração(ões) feitas sem internet foram gravadas no sistema.`);
+        }
+      },
+    });
   }
   return ses;
+}
+let off = null;
+let precached = false;
+/** Notificação do sistema (app em segundo plano). */
+function notify(title, body) {
+  if (Notification.isSupported()) new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png'), silent: true }).show();
+}
+/** Faixa no topo do painel enquanto estiver sem internet. */
+function showBanner() {
+  if (!panel || panel.isDestroyed() || !off || off.isOnline()) return;
+  const n = off.pending();
+  const js = `(function(){var b=document.getElementById('fc-off');if(!b){b=document.createElement('div');b.id='fc-off';
+    b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 14px;font:600 13px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;color:#5a3d00;background:linear-gradient(90deg,#ffe3a3,#ffd27a);box-shadow:0 -6px 20px -10px rgba(0,0,0,.35)';
+    document.body.appendChild(b);}b.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:#e08600;box-shadow:0 0 0 4px rgba(224,134,0,.25)"></span>Sem internet · usando os dados salvos no computador${n ? ` · ${n} alteração(ões) aguardando envio` : ''}';})()`;
+  panel.webContents.executeJavaScript(js).catch(() => {});
+}
+function removeBanner() {
+  if (panel && !panel.isDestroyed()) panel.webContents.executeJavaScript("var b=document.getElementById('fc-off');if(b)b.remove()").catch(() => {});
+}
+/** Páginas do painel guardadas para usar sem internet (depois do login). */
+function precachePanel() {
+  if (precached || !off || !off.isOnline()) return;
+  precached = true;
+  setTimeout(() => off.precache(['admin/', 'admin/orders.php', 'admin/retiradas.php', 'admin/chat.php', 'admin/crm.php', 'admin/fidelidade.php',
+    'admin/cupons.php', 'admin/relatorios.php', 'admin/analise.php?aba=produtos', 'admin/ofertas.php', 'admin/impressao.php', 'admin/crud.php?e=products',
+    'admin/crud.php?e=categories', 'admin/messages.php', 'admin/settings.php']), 20000);
 }
 // ---------------------------------------------------------------- Splash de abertura
 let splash = null;
@@ -178,7 +239,7 @@ function openPanel(target) {
   const wc = panel.webContents;
   // Links de fora (WhatsApp, Instagram, Mercado Pago…) abrem no navegador; janelas da loja (cupom, impressão) abrem no app
   wc.setWindowOpenHandler(({ url: u }) => {
-    if (sameSite(u)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: icon('icon.png'), webPreferences: { partition: PART, sandbox: true } } };
+    if (sameSite(u) && /\/admin\//.test(new URL(u).pathname)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: icon('icon.png'), webPreferences: { partition: PART, sandbox: true } } };
     if (/^https?:|^mailto:|^tel:/.test(u)) shell.openExternal(u);
     return { action: 'deny' };
   });
@@ -198,9 +259,20 @@ function openPanel(target) {
   });
   // Sem internet: mostra a tela de espera e tenta de novo sozinho
   let retry = null;
+  // Página travou (ex.: falta de memória): recarrega sozinha em vez de ficar branca
+  wc.on('render-process-gone', (_e, d) => { if (d.reason !== 'clean-exit') setTimeout(() => !wc.isDestroyed() && wc.reload(), 800); });
+  wc.on('did-finish-load', () => { if (off && !off.isOnline()) showBanner(); });
   wc.on('did-fail-load', (_e, code, _desc, failed, isMain) => {
     if (!isMain || code === -3) return;
     clearTimeout(retry);
+    if (off) {
+      // Sem internet: liga o modo offline e abre a cópia guardada da página
+      off.failed(code);
+      if (!off.isOnline()) {
+        retry = setTimeout(() => panel && !panel.isDestroyed() && panel.loadURL(failed || url), 300);
+        return;
+      }
+    }
     wc.loadFile(path.join(__dirname, 'offline.html'));
     retry = setTimeout(() => panel && !panel.isDestroyed() && panel.loadURL(failed || url), 15000);
   });
@@ -235,12 +307,13 @@ async function pollAlerts() {
       d.events.slice(0, 6).reverse().forEach(showAlert);
     }
     lastIds = { o: d.last_order || 0, m: d.last_message || 0, c: d.last_chat || 0, w: d.last_wa || 0 };
+    precachePanel();
     alerts = { logged: true, orders: d.new_orders || 0, chat: d.chat_waiting || 0, unread: d.unread || 0, pending: (d.new_orders || 0) + (d.chat_waiting || 0) + (d.unread || 0) };
     if (process.env.FC_DEBUG_LOG) fs.appendFileSync(process.env.FC_DEBUG_LOG, 'poll ' + JSON.stringify(alerts) + '\n');
     setBadge(alerts.pending);
     updateTray();
   } catch (e) {
-    // sem conexão: tenta na próxima rodada
+    if (off && off.isOnline()) off.check(); // confere se caiu a internet
   }
 }
 function showAlert(ev) {
@@ -372,6 +445,8 @@ function updateTray() {
   const go = (p) => () => openPanel(p);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: NAME, enabled: false },
+    ...(off && !off.isOnline() ? [{ label: '⚠ Sem internet · usando os dados salvos', enabled: false }] : []),
+    ...(off && off.pending() ? [{ label: `⬆ Enviar ${off.pending()} alteração(ões) guardada(s)`, click: () => off.sync() }] : []),
     alerts.logged === false
       ? { label: '⚠ Entre no painel para receber os avisos', click: go() }
       : { label: parts.length ? parts.join(' · ') : 'Tudo em dia ✓', enabled: false },
