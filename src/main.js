@@ -60,9 +60,11 @@ function send(channel, data) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, data);
 }
 function setState(patch) {
+  const was = state.online;
   state = { ...state, ...patch };
   send('state', state);
   updateTray();
+  if (was !== state.online && panel && !panel.isDestroyed() && typeof panelMenu === 'function') panel.setMenu(panelMenu());
 }
 function icon(name) {
   return nativeImage.createFromPath(path.join(__dirname, 'assets', name));
@@ -129,11 +131,12 @@ function openPanel(target) {
   panelSession();
   panel = new BrowserWindow({
     width: 1340, height: 880, minWidth: 900, minHeight: 600, show: true, title: NAME,
-    icon: icon('icon.png'), autoHideMenuBar: true, backgroundColor: '#FBF8F4',
+    icon: icon('icon.png'), autoHideMenuBar: false, backgroundColor: '#FBF8F4',
     // sem corretor ortográfico (baixava dicionários e deixava a digitação lenta)
     webPreferences: { partition: PART, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: true },
   });
   panel.webContents.setUserAgent(panelSession().getUserAgent());
+  panel.setMenu(panelMenu());
   panel.loadURL(url);
   const wc = panel.webContents;
   // Links de fora (WhatsApp, Instagram, Mercado Pago…) abrem no navegador; janelas da loja (cupom, impressão) abrem no app
@@ -310,6 +313,7 @@ function openWindow() {
     icon: icon('icon.png'), autoHideMenuBar: true, backgroundColor: '#1d1610',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
+  win.setMenu(null);
   win.loadFile(path.join(__dirname, 'settings.html'));
   win.on('close', (e) => {
     if (!app.isQuitting) {
@@ -346,6 +350,7 @@ function updateTray() {
     { label: 'Configurações', click: openWindow },
     ...(['available', 'downloading', 'ready'].includes(upd.state) ? [{ label: upd.state === 'ready' ? `⬆ Versão ${upd.version} pronta: reiniciar e instalar` : upd.state === 'downloading' ? `⬇ Baixando a versão ${upd.version}…` : `⬆ Nova versão ${upd.version} disponível`, click: openUpdateWindow }] : []),
     { label: 'Procurar atualizações', click: () => checkUpdates(true) },
+    { label: 'Suporte e contato do desenvolvedor', click: openAbout },
     { label: `Versão ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     { label: 'Sair (para de avisar e imprimir)', click: () => { app.isQuitting = true; app.quit(); } },
@@ -459,6 +464,7 @@ function openUpdateWindow() {
     autoHideMenuBar: true, backgroundColor: '#1d1610', show: false, maximizable: false,
     webPreferences: { preload: path.join(__dirname, 'update-preload.js'), contextIsolation: true, sandbox: true },
   });
+  updWin.setMenu(null);
   updWin.loadFile(path.join(__dirname, 'update.html'));
   updWin.once('ready-to-show', () => { updWin.show(); updWin.focus(); });
   updWin.on('closed', () => { updWin = null; });
@@ -538,6 +544,97 @@ ipcMain.handle('upd:restart', () => {
 });
 ipcMain.handle('upd:check', () => checkUpdates(true));
 ipcMain.handle('upd:close', () => updWin && !updWin.isDestroyed() && updWin.close());
+
+// ---------------------------------------------------------------- Menu da janela do painel e tela Suporte/Sobre
+const DEV = {
+  name: 'Jean Almeida',
+  links: {
+    github: 'https://github.com/JEAN-ALMEIDA-CZO',
+    portfolio: 'https://portifolio.athos.app.br',
+    linkedin: 'https://www.linkedin.com/in/jeanc-almeida',
+    instagram: 'https://www.instagram.com/jean.almeida.czo/',
+    whatsapp: 'https://wa.me/5547997804703?text=' + encodeURIComponent('Olá, Jean! Preciso de suporte no app Feliz Cristais Gestão.'),
+  },
+};
+let aboutWin = null;
+function openAbout() {
+  if (aboutWin && !aboutWin.isDestroyed()) {
+    aboutWin.show();
+    aboutWin.focus();
+    return;
+  }
+  aboutWin = new BrowserWindow({
+    width: 460, height: 600, resizable: false, maximizable: false, minimizable: false, title: `${NAME} · Suporte`,
+    icon: icon('icon.png'), backgroundColor: '#1d1610', show: false,
+    webPreferences: { preload: path.join(__dirname, 'about-preload.js'), contextIsolation: true, sandbox: true },
+  });
+  aboutWin.setMenu(null);
+  aboutWin.loadFile(path.join(__dirname, 'about.html'));
+  aboutWin.once('ready-to-show', () => aboutWin.show());
+  aboutWin.on('closed', () => { aboutWin = null; });
+}
+ipcMain.handle('about:show', () => openAbout());
+ipcMain.handle('about:get', () => ({ version: app.getVersion(), dev: DEV.name, store: siteBase() }));
+ipcMain.handle('about:open', (_e, key) => DEV.links[key] && shell.openExternal(DEV.links[key]));
+
+function panelMenu() {
+  const go = (p) => () => openPanel(p);
+  const wc = () => (panel && !panel.isDestroyed() ? panel.webContents : null);
+  return Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ label: NAME, submenu: [{ label: `Sobre o ${NAME}`, click: openAbout }, { type: 'separator' }, { role: 'hide', label: 'Ocultar' }, { type: 'separator' }, { label: 'Sair', accelerator: 'Cmd+Q', click: () => { app.isQuitting = true; app.quit(); } }] }] : []),
+    {
+      label: 'Painel',
+      submenu: [
+        { label: 'Início', accelerator: 'CmdOrCtrl+H', click: go('admin/') },
+        { label: 'Pedidos', accelerator: 'CmdOrCtrl+1', click: go('admin/orders.php') },
+        { label: 'Atendimento', accelerator: 'CmdOrCtrl+2', click: go('admin/chat.php') },
+        { label: 'Retiradas na loja', accelerator: 'CmdOrCtrl+3', click: go('admin/retiradas.php') },
+        { label: 'Clientes (CRM)', accelerator: 'CmdOrCtrl+4', click: go('admin/crm.php') },
+        { label: 'Relatórios', accelerator: 'CmdOrCtrl+5', click: go('admin/relatorios.php') },
+        { type: 'separator' },
+        { label: 'Ver o site da loja', click: () => shell.openExternal(siteBase() + '/') },
+        { type: 'separator' },
+        { label: 'Fechar janela (continua ao lado do relógio)', accelerator: 'CmdOrCtrl+W', click: () => panel && panel.close() },
+        { label: 'Sair do app', click: () => { app.isQuitting = true; app.quit(); } },
+      ],
+    },
+    {
+      label: 'Impressora',
+      submenu: [
+        { label: 'Configurações da impressora…', accelerator: 'CmdOrCtrl+,', click: openWindow },
+        { label: 'Imprimir teste', click: () => printSample().catch((e) => { addLog(e.message, 'error'); dialog.showMessageBox(panel, { type: 'warning', title: 'Impressão', message: e.message }); }) },
+        { label: 'Fila e status no painel', click: go('admin/impressao.php') },
+        { type: 'separator' },
+        { label: printReady() ? (state.online ? '● Impressora conectada' : '○ Impressora desconectada') : '○ Impressão automática desligada', enabled: false },
+      ],
+    },
+    {
+      label: 'Exibir',
+      submenu: [
+        { label: 'Recarregar', accelerator: 'F5', click: () => wc() && wc().reload() },
+        { label: 'Voltar', accelerator: 'Alt+Left', click: () => wc() && wc().navigationHistory.canGoBack() && wc().navigationHistory.goBack() },
+        { type: 'separator' },
+        { label: 'Aumentar zoom', accelerator: 'CmdOrCtrl+=', click: () => wc() && wc().setZoomLevel(wc().getZoomLevel() + 0.5) },
+        { label: 'Diminuir zoom', accelerator: 'CmdOrCtrl+-', click: () => wc() && wc().setZoomLevel(wc().getZoomLevel() - 0.5) },
+        { label: 'Tamanho normal', accelerator: 'CmdOrCtrl+0', click: () => wc() && wc().setZoomLevel(0) },
+        { type: 'separator' },
+        { label: 'Tela cheia', accelerator: 'F11', click: () => panel && panel.setFullScreen(!panel.isFullScreen()) },
+      ],
+    },
+    {
+      label: 'Suporte',
+      submenu: [
+        { label: 'Falar com o suporte (WhatsApp)', click: () => shell.openExternal(DEV.links.whatsapp) },
+        { label: 'Sobre e contato do desenvolvedor…', click: openAbout },
+        { type: 'separator' },
+        { label: 'Procurar atualizações', click: () => checkUpdates(true) },
+        { label: 'Novidades das versões (changelog)', click: () => shell.openExternal(`https://github.com/${REPO}/releases`) },
+        { type: 'separator' },
+        { label: `Versão ${app.getVersion()}`, enabled: false },
+      ],
+    },
+  ]);
+}
 
 // ---------------------------------------------------------------- Comunicação com a janela de configurações
 ipcMain.handle('get', async () => ({ config, state, log, version: app.getVersion(), printers: await listPrinters(), alerts }));
@@ -668,6 +765,7 @@ app.whenReady().then(() => {
   }
   startLoop();
   startAlerts();
+  if (!app.isPackaged && process.env.FC_OPEN_ABOUT) openAbout(); // teste da tela de suporte (desenvolvimento)
   checkUpdates();
   setInterval(checkUpdates, 6 * 60 * 60 * 1000); // procura atualização a cada 6 horas
 });

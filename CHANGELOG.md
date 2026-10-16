@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.2.0
+- Barra de menus (Painel, Impressora, Exibir, Suporte) e tela de Suporte com o contato do desenvolvedor.
+
 ## 2.1.1
 - Changelog publicado na página da versão no GitHub e exibido na tela de atualização.
 

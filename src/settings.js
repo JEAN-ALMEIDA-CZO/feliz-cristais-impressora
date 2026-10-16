@@ -85,4 +85,5 @@
   });
   $('upd').addEventListener('click', function () { window.fc.update(); });
   $('panel').addEventListener('click', function () { window.fc.panel(); });
+  $('about').addEventListener('click', function () { window.fc.about(); });
 })();
