@@ -115,6 +115,32 @@ function panelSession() {
   }
   return ses;
 }
+// ---------------------------------------------------------------- Splash de abertura
+let splash = null;
+function openSplash() {
+  splash = new BrowserWindow({
+    width: 440, height: 330, frame: false, transparent: true, resizable: false, movable: true, skipTaskbar: false,
+    alwaysOnTop: true, show: false, center: true, title: NAME, icon: icon('icon.png'), hasShadow: false,
+    webPreferences: { contextIsolation: true, sandbox: true },
+  });
+  splash.loadFile(path.join(__dirname, 'splash.html'), { query: { v: app.getVersion() } });
+  splash.once('ready-to-show', () => splash && !splash.isDestroyed() && splash.show());
+  splash.on('closed', () => { splash = null; });
+  splash.__opened = Date.now();
+  setTimeout(closeSplash, 15000); // nunca fica preso na tela
+}
+function closeSplash() {
+  if (!splash || splash.isDestroyed()) return;
+  const s = splash;
+  const wait = Math.max(0, 1400 - (Date.now() - s.__opened)); // tempo mínimo para a animação não "piscar"
+  setTimeout(() => {
+    if (s.isDestroyed()) return;
+    s.webContents.executeJavaScript("document.body.classList.add('out')").catch(() => {});
+    setTimeout(() => !s.isDestroyed() && s.destroy(), 330);
+    if (panel && !panel.isDestroyed() && !panel.isVisible()) { panel.show(); panel.focus(); }
+  }, wait);
+}
+
 function openPanel(target) {
   if (!config.site) {
     openWindow();
@@ -130,13 +156,15 @@ function openPanel(target) {
   }
   panelSession();
   panel = new BrowserWindow({
-    width: 1340, height: 880, minWidth: 900, minHeight: 600, show: true, title: NAME,
+    width: 1340, height: 880, minWidth: 900, minHeight: 600, show: !(splash && !splash.isDestroyed()), title: NAME,
     icon: icon('icon.png'), autoHideMenuBar: false, backgroundColor: '#FBF8F4',
     // sem corretor ortográfico (baixava dicionários e deixava a digitação lenta)
     webPreferences: { partition: PART, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: true },
   });
   panel.webContents.setUserAgent(panelSession().getUserAgent());
   panel.setMenu(panelMenu());
+  panel.webContents.once('did-finish-load', closeSplash);
+  panel.webContents.once('did-fail-load', closeSplash);
   panel.loadURL(url);
   const wc = panel.webContents;
   // Links de fora (WhatsApp, Instagram, Mercado Pago…) abrem no navegador; janelas da loja (cupom, impressão) abrem no app
@@ -761,6 +789,7 @@ app.whenReady().then(() => {
   } else if (!config.site) {
     openWindow();
   } else if (!hidden) {
+    openSplash();
     openPanel();
   }
   startLoop();
