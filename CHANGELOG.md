@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.4.2
+- Avisos de conexão com ícones próprios (sem internet, internet de volta, guardado no app, carga enviada) e sem emojis.
+
 ## 2.4.1
 - Mesma versão 2.4.0, agora também para Mac (a compilação do Mac tinha falhado).
 
