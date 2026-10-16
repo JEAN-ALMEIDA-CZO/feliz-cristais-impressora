@@ -1,5 +1,8 @@
 # Changelog — Feliz Cristais Gestão
 
+## 2.4.1
+- Mesma versão 2.4.0, agora também para Mac (a compilação do Mac tinha falhado).
+
 ## 2.4.0
 - Modo offline: cópia local do painel, carga do que foi salvo sem internet enviada ao voltar a conexão; correção da tela branca.
 

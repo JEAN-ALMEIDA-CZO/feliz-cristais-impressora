@@ -30,7 +30,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Compilar e publicar
-        run: npx electron-builder ${{ matrix.target }} --publish always
+        # O Mac às vezes falha ao criar o .dmg (disco ocupado): tenta de novo antes de desistir
+        shell: bash
+        run: npx electron-builder ${{ matrix.target }} --publish always || (sleep 30 && npx electron-builder ${{ matrix.target }} --publish always)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Sem certificado da Apple/Microsoft por enquanto (veja o README)
@@ -39,7 +41,7 @@ jobs:
   # Changelog na página da versão (o app mostra na tela de atualização)
   changelog:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: always() && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
